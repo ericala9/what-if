@@ -18,8 +18,10 @@ rstudioapi::writeRStudioPreference("data_viewer_max_columns", 1000L)
 
 library(dplyr)
 library(geobr)
+library(htmlwidgets)
 library(leaflet)
 library(readxl)
+library(rmapshaper)
 library(sf)
 library(stringr)
 
@@ -53,6 +55,8 @@ tab9718_2 <- read_excel("dados/tabela9718.xlsx", sheet = 2, skip = 2, na = "-")
 tab9718_3 <- read_excel("dados/tabela9718.xlsx", sheet = 3, skip = 2, na = "-")
 
 malha_brasil <- read_municipality(year = 2022, showProgress = FALSE)
+malha_estados <- read_state(year = 2020, showProgress = FALSE)
+malha_capitais <- read_capitals(showProgress = FALSE)
 
 # --------------------------- Transformação de dados --------------------------- 
 
@@ -288,87 +292,152 @@ mapa_falantes_15mais <- malha_brasil |>
   left_join(perfil_indigenas, by = c("code_muni" = "codigo_mun")) |> 
   left_join(popup_mapa, by = c("code_muni" = "codigo_mun"))
 
+# Ajuste no base com o ponto das capitais, para que o nome fique no padrão do
+# IBGE.
+malha_capitais <- malha_capitais |> 
+  left_join(
+    perfil_indigenas |> 
+      select(codigo_mun, mun),
+    by = c("code_muni" = "codigo_mun")
+  )
+
 # Ajuste na malha do mapa
 mapa_falantes_15mais <- mapa_falantes_15mais |> 
   st_transform(crs = 4326)
+malha_estados <- malha_estados |> st_transform(crs = 4326)
+malha_capitais <- malha_capitais |> st_transform(crs = 4326)
 
-paleta_cores <- colorNumeric(
-  palette = "BuGn",
-  domain = mapa_falantes_15mais$prop_falantes_ind_15mais,
-  na.color = "transparent" 
+mapa_falantes_15mais_light <- ms_simplify(
+  input = mapa_falantes_15mais, 
+  keep = 0.05,        # Mantém apenas 5% dos vértices originais (ótimo para mapa do Brasil inteiro)
+  keep_shapes = TRUE  # CRÍTICO: Garante que municípios minúsculos não desapareçam
 )
 
-mapa_falantes_15mais_final <- leaflet(data = mapa_falantes_15mais) |> 
-  addProviderTiles(providers$CartoDB.Positron) |> 
+malha_estados <- ms_simplify(
+  input = malha_estados, 
+  keep = 0.05,        # Mantém apenas 5% dos vértices originais (ótimo para mapa do Brasil inteiro)
+  keep_shapes = TRUE  # CRÍTICO: Garante que municípios minúsculos não desapareçam
+)
+
+# Estilo do rótulo do hover, que vai trazer o nome dos municípios
+rotulo_hover <- labelOptions(
+  style = list("font-weight" = "normal", padding = "3px 8px"),
+  textsize = "15px",
+  direction = "auto"
+)
+
+paleta_cores <- colorBin(
+  palette = "YlGnBu",
+  domain = mapa_falantes_15mais$prop_falantes_ind_15mais,
+  bins = c(0, 1, 5, 10, 25, 50, 100),
+  na.color = "#999999"
+)
+
+mapa_falantes_15mais_final <- leaflet(
+  data = mapa_falantes_15mais_light,
+  options = leafletOptions(
+    minZoom = 4,
+    maxZoom = 10
+  )
+) |> 
+  
+  # addProviderTiles(providers$CartoDB.PositronNoLabels) |> 
+
+  addProviderTiles(
+    providers$CartoDB.PositronNoLabels,
+    options = providerTileOptions(
+      attribution = paste(
+        "&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors",
+        "&copy; <a href='https://carto.com/attributions'>CARTO</a> | ",
+        "Dados: IBGE (2022) | <a href='https://github.com/ericala9/what-if'>@ericala9</a> (2026)"
+      )
+    )
+  ) |>
+  
+  addMapPane("limites_estaduais", zIndex = 450) |>
+  
   addPolygons(
     fillColor = ~paleta_cores(prop_falantes_ind_15mais),
-    fillOpacity = 0.8,
-    weight = 0.5,
-    color = "#444444",
+    fillOpacity = 1,
+    weight = 0.9,
+    color = "#bbbbbb",
+    label = ~lapply(mun, htmltools::HTML), 
+    labelOptions = rotulo_hover,
     popup = ~item_final, # Variável com a informação do popup
     
     # Destaca o município quando o mouse passa por cima
     highlightOptions = highlightOptions(
       weight = 2,
-      color = "#666",
+      color = "#666666",
       fillOpacity = 1,
       bringToFront = TRUE
     )
   ) |> 
+
+  # Malha dos estados
+  addPolygons(
+    data = malha_estados,
+    fill = FALSE,      
+    weight = 1.2,      
+    color = "#333333", 
+    opacity = 0.5,
+    # O SEGREDO ESTÁ AQUI:
+    options = pathOptions(pane = "limites_estaduais")
+  ) |>
+  
+  # Pin das capitais
+  addCircleMarkers(
+    data = malha_capitais,
+    radius = 4,                # Tamanho delicado para não ofuscar os municípios
+    # color = "#ffffff",         # Cor da borda (cinza escuro)
+    fillColor = "#08306b",     # Preenchimento (branco puro para dar contraste)
+    fillOpacity = 0.8,
+    weight = 1.5,
+    label = ~mun,        # O nome da capital já vem nessa coluna do geobr!
+    labelOptions = rotulo_hover,
+    # O Pulo do Gato: Colocamos as capitais no mesmo "andar" das linhas 
+    # estaduais para que o hover dos municípios não cubra os círculos!
+    options = pathOptions(pane = "limites_estaduais")
+  ) |>
   
   # Legenda
   addLegend(
     pal = paleta_cores, 
-    values = ~prop_falantes_ind_15mais, 
+    values = ~subset(prop_falantes_ind_15mais, !is.na(prop_falantes_ind_15mais)),
     opacity = 0.8, 
-    title = "Proporção de falantes de língua indígena entre os maiores de 15 anos (%)", 
+    title = "Falantes de língua indígena (15+ anos, %)",
+    labFormat = labelFormat(suffix = "%"),
     position = "bottomright"
-  )
+  ) |> 
+  
+  addControl(
+    html = "
+  <div style='background: white; padding: 6px 10px; border-radius: 6px; box-shadow: 0 0 6px rgba(0,0,0,0.2); font-size: 13px;'>
+    <span style='display:inline-block; width:10px; height:10px; border:1.2px solid #08306b; background:#08306b; border-radius:50%; margin-right:6px;'></span>
+    Capital de estado
+  </div>
+  ",
+    position = "bottomright"
+  ) |> 
 
-# Chama o mapa para ver o resultado no painel Viewer do RStudio
-mapa_falantes_15mais_final
+  addControl(
+    html = "<h3 style='margin:0; padding:5px; background: rgba(255,255,255,0.8); border-radius:5px;'>Mapa dos falantes de línguas indígenas no Brasil</h3>",
+    position = "topright"
+  )
 
 # ---------------------------- Exportação dos dados ---------------------------- 
 
-# Criação da pasta de output se ela ainda não existir.
-if (!dir.exists("./output")) {
-  dir.create("./output")
-}
-
-write.xlsx(
-  objeto_final, 
-  file = paste0("output/nomeDoArquivo", format(Sys.Date(), "%Y%m%d"), ".xlsx"),
-  colWidths = "auto",
-  headerStyle = createStyle(textDecoration = "bold")
+saveWidget(
+  widget = mapa_falantes_15mais_final,
+  file = "index.html",
+  selfcontained = TRUE
 )
-
-# ------------------------------------------------------------------------------
-#                                    Entregas 
-# ------------------------------------------------------------------------------
-#
-# Descrição dos produtos, incluindo:
-# - O que foi entregue
-# - Quem recebeu
-# - Quando e como a entrega foi feita (email, Redmine, WhatsApp, etc.)
-#
-# Exemplo:
-# - tabela_resumo.xlsx enviada para X em 2025.10.21 por email
-#
-# Exemplo:
-# Produto:       tabela_resumo.xlsx
-# Destinatário:  X
-# Data:          2025-10-21
-# Meio de envio: email
-# Notas:         Enviado junto com o relatório de resumo do projeto
 
 # ------------------------------------------------------------------------------
 #                                Próximos passos
 # ------------------------------------------------------------------------------
-# - Colocar título
 # - Colocar aba pesquisável
-# - Arrumar a legenda
-# - Destacar o limite dos estados
-# - Tirar as legendas
-# - Hover com nome do município
 # - Mapa de calor e/ou aquele de bolinhas com a distribuição das línguas pelo municípios
+# - Narrative enhancement (more contextual cues, maybe state-level grouping)?
+# - Or conceptual layering (switching between different metrics)?
 # ------------------------------------------------------------------------------
