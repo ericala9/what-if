@@ -1,11 +1,12 @@
 # ==============================================================================
-#                      Mapa das línguas indígenas no Brasil 
+#                Mapa dos falantes de línguas indígenas no Brasil
 # ==============================================================================
-# Título: Mapa das línguas indígenas no Brasil 
+# Título: Mapa dos falantes de línguas indígenas no Brasil 
 # Autor: Érica Ambrosio
-# Objetivo: Criação de mapa interativo que mostre as línguas indígenas mais
-# faladas em cada município do Brasil a partir dos dados do Censo 2022.
+# Objetivo: Criação de mapa interativo que mostra onde estão os falantes de
+# línguas indígenas no Brasil a partir dos dados do Censo 2022.
 # Data: 2026-02-20
+# Repositório: https://github.com/ericala9/what-if
 # ==============================================================================
 
 # ------------------------- Configuração do ambiente  -------------------------- 
