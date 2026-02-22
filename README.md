@@ -84,16 +84,3 @@ For now, this is a first version.
 A map.
 A question.
 A beginning.
-
----
-
-If you read this slowly… does it feel like your voice?
-
-If you want, we can:
-
-* Make it more technical.
-* Make it softer.
-* Make it sharper.
-* Or make it slightly more ironic to match the title.
-
-And when you’re ready, we can refine it line by line the way you refine your code.
