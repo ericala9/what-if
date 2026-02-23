@@ -4,11 +4,9 @@ What if my main language had very little written material? What if there were fe
 
 This project began there.
 
-It is an interactive map of Indigenous languages spoken in Brazil, based on data from the 2022 Demographic Census conducted by the Instituto Brasileiro de Geografia e Estatística (IBGE).
+It is an interactive map of Indigenous languages spoken in Brazil, based on data from the 2022 Demographic Census conducted by the Instituto Brasileiro de Geografia e Estatística (IBGE), built with R and Leaflet.
 
-But it is not only about distribution.
-
-It is about presence.
+---
 
 ## what this map shows
 
