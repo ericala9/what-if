@@ -438,6 +438,7 @@ saveWidget(
 #                                Próximos passos
 # ------------------------------------------------------------------------------
 # - Colocar aba pesquisável
+# - Responsividade
 # - Mapa de calor e/ou aquele de bolinhas com a distribuição das línguas pelo municípios
 # - Narrative enhancement (more contextual cues, maybe state-level grouping)?
 # - Or conceptual layering (switching between different metrics)?
